@@ -1,0 +1,55 @@
+name: Deploy Frontend to Nginx
+
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  deploy-frontend:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Code
+      uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+
+    - name: Install Dependencies
+      run: npm ci || npm install
+
+    - name: Build React App
+      run: npm run build
+
+    - name: Transfer Frontend Build Files to EC2 Temp Dir
+      uses: appleboy/scp-action@v0.1.7
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        # Vite(dist) 또는 CRA(build) 폴더 내 파일들을 임시 디렉터리로 전송
+        source: "dist/*,build/*"
+        target: "/home/ubuntu/frontend-build"
+        strip_components: 1
+
+    - name: Deploy Frontend to Nginx Web Root
+      uses: appleboy/ssh-action@v1.0.3
+      with:
+        host: ${{ secrets.EC2_HOST }}
+        username: ${{ secrets.EC2_USERNAME }}
+        key: ${{ secrets.EC2_SSH_KEY }}
+        script: |
+          # 1. Nginx 기본 웹루트 경로 생성 및 기존 파일 삭제
+          sudo mkdir -p /var/www/html
+          sudo rm -rf /var/www/html/*
+          
+          # 2. 전송된 정적 파일들을 Nginx 웹루트로 이동
+          sudo cp -r /home/ubuntu/frontend-build/* /var/www/html/
+          sudo rm -rf /home/ubuntu/frontend-build
+
+          # 3. Nginx 서비스 재설정 적용
+          sudo systemctl reload nginx
+          echo "Frontend successfully deployed to Nginx web root!"
