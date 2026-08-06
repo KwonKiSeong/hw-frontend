@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 
-const API_BASE_URL = 'http://localhost:8006/api/boards';
+const API_BASE_URL = 'http://localhost:8080/api/boards';
 
 export default function App() {
   const [boards, setBoards] = useState([]);
